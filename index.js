@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const csv = require('csv-parser');
+const axios = require('axios');
 
 // Define the paths to the CSV files
 const categoriesFilePath = path.join(__dirname, 'categories.csv');
@@ -65,6 +66,24 @@ function loadTransactions() {
       });
   });
 }
+
+
+async function queryModel() {
+  try {
+    const response = await axios.post('http://localhost:11434/api/generate', {
+        model: 'llama3.2:latest',
+        stream: false,
+        prompt: "Why is the sky blue?",
+    
+      });
+
+    console.log('API Response:', response.data);
+  } catch (error) {
+    console.error('Error calling the model API:', error.message);
+  }
+}
+
+queryModel();
 
 // Load categories and transactions
 Promise.all([loadCategories(), loadTransactions()])
