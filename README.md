@@ -3,6 +3,8 @@
 
 categorAIze - Use local AI models to categorize financial transactions
 
+Note: This is currently a non-functional work in progress. It's mainly being built by AI tools with me as a guide. 
+
 
 Large Language Models (LLMs) can provide significant help when analyzing financial transactions. Sorting transactions into categories is important for proper accounting and tax purposes. However, sending your personal financial data to large corporations is not ideal. 
 
