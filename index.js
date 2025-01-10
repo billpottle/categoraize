@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const csv = require('csv-parser');
 const axios = require('axios');
+const { getPrompt } = require('./prompt');
 
 // Define the paths to the CSV files
 const categoriesFilePath = path.join(__dirname, 'categories.csv');
@@ -53,7 +54,7 @@ function loadTransactions() {
           transactions.push({ date, transaction, amount, account });
         }
         else {
-            console.log("Error Adding: ", row)
+          console.log("Error Adding: ", row)
         }
       })
       .on('end', () => {
@@ -68,27 +69,37 @@ function loadTransactions() {
 }
 
 
-async function queryModel() {
+async function queryModel(prompt) {
   try {
     const response = await axios.post('http://localhost:11434/api/generate', {
-        model: 'llama3.2:latest',
-        stream: false,
-        prompt: "Why is the sky blue?",
-    
-      });
+      model: 'llama3.2:latest',
+      stream: false,
+      prompt: prompt,
 
-    console.log('API Response:', response.data);
+    });
+    //console.log('API Response:', response.data);
+    return response.data.response;
+
   } catch (error) {
     console.error('Error calling the model API:', error.message);
   }
 }
 
-queryModel();
 
+const runAnalysis = async () => {
+  transactions.forEach(async (transaction) => {
+    prompt = getPrompt([], transaction, categories)
+    category = await queryModel(prompt);
+    console.log(category)
+  })
+}
+
+console.log('Loading data from files')
 // Load categories and transactions
 Promise.all([loadCategories(), loadTransactions()])
   .then(() => {
     console.log('Data successfully loaded and ready for processing.');
+    runAnalysis()
   })
   .catch((error) => {
     console.error('Failed to load data:', error);
