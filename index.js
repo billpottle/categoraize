@@ -14,6 +14,9 @@ let categories = [];
 // Array to store transactions
 let transactions = [];
 
+// Array to store existing categorized transactions
+let existingSheet = [];
+
 // Function to load categories from the categories CSV
 function loadCategories() {
   return new Promise((resolve, reject) => {
@@ -68,6 +71,44 @@ function loadTransactions() {
   });
 }
 
+// Function to load existing categorized transactions
+function loadExistingSheet() {
+  return new Promise((resolve, reject) => {
+    const existingFilePath = path.join(__dirname, 'existing.csv');
+    
+    fs.createReadStream(existingFilePath)
+      .pipe(csv())
+      .on('data', (row) => {
+        const firstColumnKey = Object.keys(row)[0]; // Dynamically determine the first column
+        const date = row[firstColumnKey];
+        
+        // Find column names case-insensitively
+        const transactionKey = Object.keys(row).find(key => key.toLowerCase() === 'transaction');
+        const amountKey = Object.keys(row).find(key => key.toLowerCase() === 'amount');
+        const categoryKey = Object.keys(row).find(key => key.toLowerCase() === 'category');
+        const accountKey = Object.keys(row).find(key => key.toLowerCase() === 'account');
+
+        const transaction = row[transactionKey];
+        const amount = parseFloat(row[amountKey]);
+        const category = row[categoryKey];
+        const account = row[accountKey];
+
+        if (transaction) {
+          existingSheet.push({ date, transaction, amount, category, account });
+        } else {
+          console.log("Error Adding to Existing Sheet: ", row);
+        }
+      })
+      .on('end', () => {
+        console.log('Existing sheet loaded:', existingSheet);
+        resolve(existingSheet);
+      })
+      .on('error', (error) => {
+        console.error('Error reading the existing sheet file:', error);
+        reject(error);
+      });
+  });
+}
 
 async function queryModel(prompt) {
   try {
@@ -95,8 +136,8 @@ const runAnalysis = async () => {
 }
 
 console.log('Loading data from files')
-// Load categories and transactions
-Promise.all([loadCategories(), loadTransactions()])
+// Load categories, transactions, and existing sheet
+Promise.all([loadCategories(), loadTransactions(), loadExistingSheet()])
   .then(() => {
     console.log('Data successfully loaded and ready for processing.');
     runAnalysis()
@@ -108,6 +149,8 @@ Promise.all([loadCategories(), loadTransactions()])
 module.exports = {
   loadCategories,
   loadTransactions,
+  loadExistingSheet,
   getCategories: () => categories,
   getTransactions: () => transactions,
+  getExistingSheet: () => existingSheet,
 };
