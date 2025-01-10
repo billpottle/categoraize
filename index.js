@@ -126,13 +126,30 @@ async function queryModel(prompt) {
   }
 }
 
+// Function to append a new transaction with its category to existing.csv
+function appendToExisting(transaction, category) {
+  const existingFilePath = path.join(__dirname, 'existing.csv');
+  const newLine = `\n${transaction.date},${transaction.transaction},${transaction.amount},${category},${transaction.account}`;
+  
+  fs.appendFile(existingFilePath, newLine, (err) => {
+    if (err) {
+      console.error('Error appending to existing.csv:', err);
+    } else {
+      console.log('Successfully appended transaction to existing.csv');
+      // Also add to our in-memory array
+      // this will help enforce consistency
+      existingSheet.push({ ...transaction, category });
+    }
+  });
+}
 
 const runAnalysis = async () => {
   transactions.forEach(async (transaction) => {
-    prompt = getPrompt([], transaction, categories)
+    prompt = getPrompt(existingSheet, transaction, categories);
     category = await queryModel(prompt);
-    console.log(category)
-  })
+    console.log(category);
+    appendToExisting(transaction, category);
+  });
 }
 
 console.log('Loading data from files')
