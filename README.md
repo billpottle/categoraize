@@ -1,10 +1,10 @@
-# categoraize
+# categorAIze
 
-
-categorAIze - Use local AI models to categorize financial transactions
+Use local AI models to categorize financial transactions
 
 Note: This is currently a minimal proof of concept work in progress. It's mainly being built by AI tools with me as a guide. 
 
+## Overview
 
 Large Language Models (LLMs) can provide significant help when analyzing financial transactions. Sorting transactions into categories is important for proper accounting and tax purposes. However, sending your personal financial data to large corporations is not ideal. 
 
@@ -14,18 +14,29 @@ With all their expenses in context, users can also provide any other financial i
 
 Users can choose different LLMs for the underlying analysis. 
 
+## How to Run
 
-##How to run. ##
+1. Download and install Ollama
+2. Open a terminal with 2 tabs
+3. In the first tab, run:
+   ```bash
+   ollama run llama2:latest
+   ```
+4. In the second tab, run:
+   ```bash
+   node index.js
+   ```
 
-After downloading ollama, open a terminal with 2 tabs. In the first tab type
+## File Setup
 
- ollama run llama3.2:latest
+- `existing.csv`: Your existing transactions that will be used as a guide
+- `categories.csv`: Your allowed categories (For instance, this might sync with a tax form like the schedule C for small businesses)
+- `transactions.csv`: The list of transactions that you wish to assign categories to
 
-In the second tab run 
+**Important**: Make sure to close the existing.csv file before running so that your newly categorized transactions can be appended.
 
-node index.js
+## Model Selection
 
-
-The existing.csv file should be your existing transactions that will be used as a guide. The categories.csv file should be your allowed categories. (For instance, this might sync with a tax form like the schedule C for small businesses). The transactions.csv file should contain the list of transactions that you wish to assign categories to. Make sure to close the existing.csv file before running so that your newly categorized transactions can be appended. 
-
-Note: If you want to use a different model, specify it in the ollama run command as well as index.js
+Note: If you want to use a different model, specify it in both:
+- The ollama run command
+- index.js
