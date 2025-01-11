@@ -21,7 +21,29 @@ const getPrompt = (existingSheet, transaction, categories) => {
     );
 }
 
+const getAnalysisPrompt = (summaryTable, userContext = '') => {
+    return (
+        "You are a helpful financial analyst. I will provide you with a summary of monthly spending by category " +
+        "along with additional context about the person's financial situation. " +
+        "Please analyze this data and provide personalized insights and advice.\n\n" +
+        "Monthly Spending Summary:\n" +
+        "```\n" +
+        summaryTable +
+        "```\n" +
+        (userContext ? "\nAdditional Context:\n" + userContext + "\n\n" : "\n") +
+        "Please provide:\n" +
+        "1. Analysis of spending patterns and trends\n" +
+        "2. Categories with notably high or low spending\n" +
+        "3. Personalized recommendations based on the provided context\n" +
+        "4. Specific advice addressing any stated goals or questions\n" +
+        "5. Potential areas for budget optimization\n\n" +
+        "Please provide your analysis in clear, concise bullet points, focusing on actionable insights." +
+        "Please also be certain to asnwer any specific questions in the Additional Context"
+    );
+}
+
 module.exports = {
     getPrompt,
-    formatTransaction
+    formatTransaction,
+    getAnalysisPrompt
 };

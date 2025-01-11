@@ -2,7 +2,10 @@ const fs = require('fs');
 const path = require('path');
 const csv = require('csv-parser');
 const axios = require('axios');
-const { getPrompt } = require('./prompt');
+const { getPrompt, getAnalysisPrompt } = require('./prompt');
+const { createMonthlySummary } = require('./summary');
+const readline = require('readline');
+const chalk = require('chalk');
 
 // Define the paths to the CSV files
 const categoriesFilePath = path.join(__dirname, 'categories.csv');
@@ -16,6 +19,15 @@ let transactions = [];
 
 // Array to store existing categorized transactions
 let existingSheet = [];
+
+// Create readline interface for user input
+const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout
+});
+
+// Promisify the question method
+const askQuestion = (query) => new Promise((resolve) => rl.question(query, resolve));
 
 // Function to load categories from the categories CSV
 function loadCategories() {
@@ -61,7 +73,7 @@ function loadTransactions() {
         }
       })
       .on('end', () => {
-        console.log('Transactions loaded:', transactions);
+        //console.log('Transactions loaded:', transactions);
         resolve(transactions);
       })
       .on('error', (error) => {
@@ -100,7 +112,7 @@ function loadExistingSheet() {
         }
       })
       .on('end', () => {
-        console.log('Existing sheet loaded:', existingSheet);
+        //console.log('Existing sheet loaded:', existingSheet);
         resolve(existingSheet);
       })
       .on('error', (error) => {
@@ -127,7 +139,7 @@ async function queryModel(prompt) {
 }
 
 // Function to append a new transaction with its category to existing.csv
-function appendToExisting(transaction, category) {
+function appendToExisting(transaction, category, callback = () => {}) {
   const existingFilePath = path.join(__dirname, 'existing.csv');
   const newLine = `\n${transaction.date},${transaction.transaction},${transaction.amount},${category},${transaction.account}`;
   
@@ -135,21 +147,50 @@ function appendToExisting(transaction, category) {
     if (err) {
       console.error('Error appending to existing.csv:', err);
     } else {
-      console.log('Successfully appended transaction to existing.csv');
+      console.log(chalk.gray('Successfully appended transaction to existing.csv'));
       // Also add to our in-memory array
-      // this will help enforce consistency
       existingSheet.push({ ...transaction, category });
     }
+    callback();
   });
 }
 
 const runAnalysis = async () => {
-  transactions.forEach(async (transaction) => {
-    prompt = getPrompt(existingSheet, transaction, categories);
-    category = await queryModel(prompt);
-    console.log(category);
-    appendToExisting(transaction, category);
-  });
+    // Process all transactions sequentially and wait for them to complete
+    for (const transaction of transactions) {
+        prompt = getPrompt(existingSheet, transaction, categories);
+        category = await queryModel(prompt);
+        console.log(chalk.blue(`Categorized as: ${chalk.bold(category)}`));
+        // Wait for append to complete before continuing
+        await new Promise((resolve, reject) => {
+            appendToExisting(transaction, category, resolve);
+        });
+    }
+    
+    // Small delay to ensure file system has completed writing
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    // Generate and display the summary
+    const summaryTable = createMonthlySummary(existingSheet);
+    console.log(chalk.yellow('\n=== Monthly Spending Summary ==='));
+    console.log(summaryTable);
+
+    // Get additional context from user with a single, open-ended prompt
+    console.log(chalk.yellow('\n=== Additional Context ==='));
+    console.log(chalk.cyan('To get more personalized financial insights, you can provide additional context about your situation.'));
+    console.log(chalk.gray('Suggestions: annual income, age, savings, investments, debt, financial goals, specific questions'));
+    console.log(chalk.gray('(Press Enter to skip)\n'));
+    
+    const context = await askQuestion(chalk.green('What additional information would you like to share? '));
+    
+    // Get AI insights on the summary with additional context
+    console.log(chalk.cyan('\nAnalyzing spending patterns and providing personalized advice...'));
+    const analysisPrompt = getAnalysisPrompt(summaryTable, context);
+    const insights = await queryModel(analysisPrompt);
+    console.log(chalk.yellow('\n=== AI Insights ==='));
+    console.log(chalk.white(insights));
+
+    rl.close();
 }
 
 console.log('Loading data from files')
