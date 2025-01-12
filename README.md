@@ -24,7 +24,7 @@ Users can choose different LLMs for the underlying analysis.
 2. Open a terminal with 2 tabs
 3. In the first tab, run:
    ```bash
-   ollama run llama2:latest
+   ollama run llama3.2:latest
    ```
 4. In the second tab, run:
    ```bash
