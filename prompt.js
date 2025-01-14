@@ -42,8 +42,27 @@ const getAnalysisPrompt = (summaryTable, userContext = '') => {
     );
 }
 
+const getFollowUpPrompt = (summaryTable, conversationHistory) => {
+    return (
+        "You are a helpful financial analyst having a conversation about the following financial data. " +
+        "You should provide specific insights and recommendations based on the data and context provided. " +
+        "Do not be overly cautious or hesitant - you are analyzing spending data and providing observations " +
+        "and suggestions, not giving regulated financial advice.\n\n" +
+        "Monthly Spending Summary:\n" +
+        "```\n" +
+        summaryTable +
+        "```\n\n" +
+        "Previous conversation:\n" +
+        conversationHistory.map(msg => `${msg.role}: ${msg.content}`).join('\n') +
+        "\n\nPlease provide a clear and direct response to the latest question, " +
+        "maintaining context from the previous conversation and referencing the spending data when relevant. " +
+        "Focus on practical observations and actionable suggestions based on the spending patterns shown in the data."
+    );
+}
+
 module.exports = {
     getPrompt,
     formatTransaction,
-    getAnalysisPrompt
+    getAnalysisPrompt,
+    getFollowUpPrompt
 };

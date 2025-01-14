@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const csv = require('csv-parser');
 const axios = require('axios');
-const { getPrompt, getAnalysisPrompt } = require('./prompt');
+const { getPrompt, getAnalysisPrompt, getFollowUpPrompt } = require('./prompt');
 const { createMonthlySummary } = require('./summary');
 const readline = require('readline');
 const chalk = require('chalk');
@@ -155,6 +155,52 @@ function appendToExisting(transaction, category, callback = () => {}) {
   });
 }
 
+const startConversation = async (summaryTable, initialContext = '') => {
+    let conversationHistory = [];
+    
+    // Initial analysis
+    console.log(chalk.cyan('\nAnalyzing spending patterns and providing personalized advice...'));
+    const analysisPrompt = getAnalysisPrompt(summaryTable, initialContext);
+    const initialInsights = await queryModel(analysisPrompt);
+    console.log(chalk.yellow('\n=== AI Insights ==='));
+    console.log(chalk.white(initialInsights));
+    
+    // Store initial conversation
+    conversationHistory.push({
+        role: "user",
+        content: analysisPrompt
+    });
+    conversationHistory.push({
+        role: "assistant",
+        content: initialInsights
+    });
+
+    while (true) {
+        console.log(chalk.gray('\nType your follow-up question (or "exit" to quit)'));
+        const question = await askQuestion(chalk.green('> '));
+        
+        if (question.toLowerCase() === 'exit') {
+            break;
+        }
+
+        // Add user's question to history
+        conversationHistory.push({
+            role: "user",
+            content: question
+        });
+
+        // Get AI response with full context
+        const response = await queryModel(getFollowUpPrompt(summaryTable, conversationHistory));
+        console.log(chalk.white(response));
+
+        // Add AI's response to history
+        conversationHistory.push({
+            role: "assistant",
+            content: response
+        });
+    }
+}
+
 const runAnalysis = async () => {
     // Process all transactions sequentially and wait for them to complete
     for (const transaction of transactions) {
@@ -175,20 +221,16 @@ const runAnalysis = async () => {
     console.log(chalk.yellow('\n=== Monthly Spending Summary ==='));
     console.log(summaryTable);
 
-    // Get additional context from user with a single, open-ended prompt
+    // Get initial context
     console.log(chalk.yellow('\n=== Additional Context ==='));
     console.log(chalk.cyan('To get more personalized financial insights, you can provide additional context about your situation.'));
     console.log(chalk.gray('Suggestions: annual income, age, savings, investments, debt, financial goals, specific questions'));
     console.log(chalk.gray('(Press Enter to skip)\n'));
     
-    const context = await askQuestion(chalk.green('What additional information would you like to share? '));
+    const initialContext = await askQuestion(chalk.green('What additional information would you like to share? '));
     
-    // Get AI insights on the summary with additional context
-    console.log(chalk.cyan('\nAnalyzing spending patterns and providing personalized advice...'));
-    const analysisPrompt = getAnalysisPrompt(summaryTable, context);
-    const insights = await queryModel(analysisPrompt);
-    console.log(chalk.yellow('\n=== AI Insights ==='));
-    console.log(chalk.white(insights));
+    // Start interactive conversation
+    await startConversation(summaryTable, initialContext);
 
     rl.close();
 }
