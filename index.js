@@ -7,6 +7,47 @@ const { createMonthlySummary } = require('./summary');
 const readline = require('readline');
 const chalk = require('chalk');
 
+// Parse command line arguments
+const args = process.argv.slice(2);
+const config = {
+  verbose: false,
+  model: 'llama3.2:latest',
+  skipDuplicates: false,
+  changeSign: false
+};
+
+// Process command line arguments
+for (let i = 0; i < args.length; i++) {
+  switch (args[i]) {
+    case '-v':
+      config.verbose = true;
+      break;
+    case '-m':
+      if (i + 1 < args.length) {
+        config.model = args[++i];
+      }
+      break;
+    case '-d':
+      config.skipDuplicates = true;
+      break;
+    case '-cs':
+      config.changeSign = true;
+      break;
+    case '-h':
+      console.log(`
+Usage: node index.js [options]
+
+Options:
+  -v        Verbose mode
+  -m MODEL  Specify which model to use (default: llama2:latest)
+  -d        Do not consider transactions which are already in existing.csv
+  -cs       Change the sign (+ or -) of the transactions.csv file entries
+  -h        Show this help message
+`);
+      process.exit(0);
+  }
+}
+
 // Define the paths to the CSV files
 const categoriesFilePath = path.join(__dirname, 'categories.csv');
 const transactionsFilePath = path.join(__dirname, 'transactions.csv');
@@ -22,8 +63,8 @@ let existingSheet = [];
 
 // Create readline interface for user input
 const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout
+  input: process.stdin,
+  output: process.stdout
 });
 
 // Promisify the question method
@@ -73,7 +114,9 @@ function loadTransactions() {
         }
       })
       .on('end', () => {
-        //console.log('Transactions loaded:', transactions);
+        if (config.verbose) {
+          console.log('Transactions loaded:', transactions);
+        }
         resolve(transactions);
       })
       .on('error', (error) => {
@@ -87,13 +130,13 @@ function loadTransactions() {
 function loadExistingSheet() {
   return new Promise((resolve, reject) => {
     const existingFilePath = path.join(__dirname, 'existing.csv');
-    
+
     fs.createReadStream(existingFilePath)
       .pipe(csv())
       .on('data', (row) => {
         const firstColumnKey = Object.keys(row)[0]; // Dynamically determine the first column
         const date = row[firstColumnKey];
-        
+
         // Find column names case-insensitively
         const transactionKey = Object.keys(row).find(key => key.toLowerCase() === 'transaction');
         const amountKey = Object.keys(row).find(key => key.toLowerCase() === 'amount');
@@ -112,7 +155,9 @@ function loadExistingSheet() {
         }
       })
       .on('end', () => {
-        //console.log('Existing sheet loaded:', existingSheet);
+        if (config.verbose) {
+          console.log('Existing sheet loaded:', existingSheet);
+        }
         resolve(existingSheet);
       })
       .on('error', (error) => {
@@ -123,6 +168,9 @@ function loadExistingSheet() {
 }
 
 async function queryModel(prompt) {
+  if (config.verbose) {
+    console.log(prompt)
+  }
   try {
     const response = await axios.post('http://localhost:11434/api/generate', {
       model: 'llama3.2:latest',
@@ -130,7 +178,9 @@ async function queryModel(prompt) {
       prompt: prompt,
 
     });
-    //console.log('API Response:', response.data);
+    if (config.verbose) {
+      console.log('API Response:', response.data);
+    }
     return response.data.response;
 
   } catch (error) {
@@ -139,10 +189,10 @@ async function queryModel(prompt) {
 }
 
 // Function to append a new transaction with its category to existing.csv
-function appendToExisting(transaction, category, callback = () => {}) {
+function appendToExisting(transaction, category, callback = () => { }) {
   const existingFilePath = path.join(__dirname, 'existing.csv');
   const newLine = `\n${transaction.date},${transaction.transaction},${transaction.amount},${category},${transaction.account}`;
-  
+
   fs.appendFile(existingFilePath, newLine, (err) => {
     if (err) {
       console.error('Error appending to existing.csv:', err);
@@ -156,83 +206,83 @@ function appendToExisting(transaction, category, callback = () => {}) {
 }
 
 const startConversation = async (summaryTable, initialContext = '') => {
-    let conversationHistory = [];
-    
-    // Initial analysis
-    console.log(chalk.cyan('\nAnalyzing spending patterns and providing personalized advice...'));
-    const analysisPrompt = getAnalysisPrompt(summaryTable, initialContext);
-    const initialInsights = await queryModel(analysisPrompt);
-    console.log(chalk.yellow('\n=== AI Insights ==='));
-    console.log(chalk.white(initialInsights));
-    
-    // Store initial conversation
-    conversationHistory.push({
-        role: "user",
-        content: analysisPrompt
-    });
-    conversationHistory.push({
-        role: "assistant",
-        content: initialInsights
-    });
+  let conversationHistory = [];
 
-    while (true) {
-        console.log(chalk.gray('\nType your follow-up question (or "exit" to quit)'));
-        const question = await askQuestion(chalk.green('> '));
-        
-        if (question.toLowerCase() === 'exit') {
-            break;
-        }
+  // Initial analysis
+  console.log(chalk.cyan('\nAnalyzing spending patterns and providing personalized advice...'));
+  const analysisPrompt = getAnalysisPrompt(summaryTable, initialContext);
+  const initialInsights = await queryModel(analysisPrompt);
+  console.log(chalk.yellow('\n=== AI Insights ==='));
+  console.log(chalk.white(initialInsights));
 
-        // Add user's question to history
-        conversationHistory.push({
-            role: "user",
-            content: question
-        });
+  // Store initial conversation
+  conversationHistory.push({
+    role: "user",
+    content: analysisPrompt
+  });
+  conversationHistory.push({
+    role: "assistant",
+    content: initialInsights
+  });
 
-        // Get AI response with full context
-        const response = await queryModel(getFollowUpPrompt(summaryTable, conversationHistory));
-        console.log(chalk.white(response));
+  while (true) {
+    console.log(chalk.gray('\nType your follow-up question (or "exit" to quit)'));
+    const question = await askQuestion(chalk.green('> '));
 
-        // Add AI's response to history
-        conversationHistory.push({
-            role: "assistant",
-            content: response
-        });
+    if (question.toLowerCase() === 'exit') {
+      break;
     }
+
+    // Add user's question to history
+    conversationHistory.push({
+      role: "user",
+      content: question
+    });
+
+    // Get AI response with full context
+    const response = await queryModel(getFollowUpPrompt(summaryTable, conversationHistory));
+    console.log(chalk.white(response));
+
+    // Add AI's response to history
+    conversationHistory.push({
+      role: "assistant",
+      content: response
+    });
+  }
 }
 
 const runAnalysis = async () => {
-    // Process all transactions sequentially and wait for them to complete
-    for (const transaction of transactions) {
-        prompt = getPrompt(existingSheet, transaction, categories);
-        category = await queryModel(prompt);
-        console.log(chalk.blue(`Categorized as: ${chalk.bold(category)}`));
-        // Wait for append to complete before continuing
-        await new Promise((resolve, reject) => {
-            appendToExisting(transaction, category, resolve);
-        });
-    }
-    
-    // Small delay to ensure file system has completed writing
-    await new Promise(resolve => setTimeout(resolve, 100));
-    
-    // Generate and display the summary
-    const summaryTable = createMonthlySummary(existingSheet);
-    console.log(chalk.yellow('\n=== Monthly Spending Summary ==='));
-    console.log(summaryTable);
+  // Process all transactions sequentially and wait for them to complete
+  for (const transaction of transactions) {
+    prompt = getPrompt(existingSheet, transaction, categories);
+    category = await queryModel(prompt);
+    console.log(chalk.blue(`Categorized as: ${chalk.bold(category)}`));
+    // Wait for append to complete before continuing
+    await new Promise((resolve, reject) => {
+      appendToExisting(transaction, category, resolve);
+    });
+  }
 
-    // Get initial context
-    console.log(chalk.yellow('\n=== Additional Context ==='));
-    console.log(chalk.cyan('To get more personalized financial insights, you can provide additional context about your situation.'));
-    console.log(chalk.gray('Suggestions: annual income, age, savings, investments, debt, financial goals, specific questions'));
-    console.log(chalk.gray('(Press Enter to skip)\n'));
-    
-    const initialContext = await askQuestion(chalk.green('What additional information would you like to share? '));
-    
-    // Start interactive conversation
-    await startConversation(summaryTable, initialContext);
+  // Small delay to ensure file system has completed writing
+  await new Promise(resolve => setTimeout(resolve, 100));
 
-    rl.close();
+  // Generate and display the summary
+  const summaryTable = createMonthlySummary(existingSheet);
+  console.log(chalk.yellow('\n=== Monthly Spending Summary ==='));
+  console.log(summaryTable);
+
+  // Get initial context
+  console.log(chalk.yellow('\n=== Additional Context ==='));
+  console.log(chalk.cyan('To get more personalized financial insights, you can provide additional context about your situation.'));
+  console.log(chalk.gray('Suggestions: annual income, age, savings, investments, debt, financial goals, specific questions'));
+  console.log(chalk.gray('(Press Enter to skip)\n'));
+
+  const initialContext = await askQuestion(chalk.green('What additional information would you like to share? '));
+
+  // Start interactive conversation
+  await startConversation(summaryTable, initialContext);
+
+  rl.close();
 }
 
 console.log('Loading data from files')

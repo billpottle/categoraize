@@ -14,7 +14,7 @@ Large Language Models (LLMs) can provide significant help when analyzing financi
 
 This is a node.js app which runs in tandem with a locally running model with ollama. It takes in a raw csv file (probably downloaded from a financial institution), a config file, and a list of allowable categories. The locally running llm will then use the available information as well as the existing list of transactions and their category to make a best guess on which category the new transactions should fit in. 
 
-With all their expenses in context, users can also provide any other financial information (ie, approximate income, retirement dates, assets, etc) and ask questions about their personal financial situation. (coming soon)
+With all their expenses in context, users can also provide any other financial information (ie, approximate income, retirement dates, assets, etc) and ask questions about their personal financial situation.
 
 Users can choose different LLMs for the underlying analysis. 
 
@@ -28,8 +28,31 @@ Users can choose different LLMs for the underlying analysis.
    ```
 4. In the second tab, run:
    ```bash
-   node index.js
+   node index.js [options]
    ```
+
+### Command Line Options
+
+```
+Options:
+  -v        Verbose mode
+  -m MODEL  Specify which model to use (default: llama2:latest)
+  -d        Do not consider transactions which are already in existing.csv
+  -cs       Change the sign (+ or -) of the transactions.csv file entries
+  -h        Show this help message
+```
+
+Examples:
+```bash
+# Run with default settings
+node index.js
+
+# Use a different model and enable verbose mode
+node index.js -m mistral:latest -v
+
+# Skip duplicates and change transaction signs
+node index.js -d -cs
+```
 
 ## File Setup
 
@@ -41,6 +64,5 @@ Users can choose different LLMs for the underlying analysis.
 
 ## Model Selection
 
-Note: If you want to use a different model, specify it in both:
-- The ollama run command
-- index.js
+You can specify which model to use with the `-m` flag. This should be the same model you run in your ollama window
+- `llama3.2:latest` (default)
