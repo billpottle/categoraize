@@ -103,8 +103,13 @@ function loadTransactions() {
         const firstColumnKey = Object.keys(row)[0]; // Dynamically determine the first column
         const date = row[firstColumnKey];
         const transaction = row['Transaction'];
-        const amount = parseFloat(row['Amount']);
+        let amount = parseFloat(row['Amount']);
         const account = row['Account'];
+
+        // Change sign if -cs flag is set
+        if (config.changeSign) {
+          amount = -amount;
+        }
 
         if (date && transaction && !isNaN(amount) && account) {
           transactions.push({ date, transaction, amount, account });
@@ -189,10 +194,10 @@ async function queryModel(prompt) {
 }
 
 // Function to append a new transaction with its category to existing.csv
-function appendToExisting(transaction, category, callback = () => { }) {
+function appendToExisting(transaction, category, callback = () => {}) {
   const existingFilePath = path.join(__dirname, 'existing.csv');
   const newLine = `\n${transaction.date},${transaction.transaction},${transaction.amount},${category},${transaction.account}`;
-
+  
   fs.appendFile(existingFilePath, newLine, (err) => {
     if (err) {
       console.error('Error appending to existing.csv:', err);
@@ -252,37 +257,53 @@ const startConversation = async (summaryTable, initialContext = '') => {
 }
 
 const runAnalysis = async () => {
-  // Process all transactions sequentially and wait for them to complete
-  for (const transaction of transactions) {
-    prompt = getPrompt(existingSheet, transaction, categories);
-    category = await queryModel(prompt);
-    console.log(chalk.blue(`Categorized as: ${chalk.bold(category)}`));
-    // Wait for append to complete before continuing
-    await new Promise((resolve, reject) => {
-      appendToExisting(transaction, category, resolve);
-    });
-  }
+    // Process all transactions sequentially and wait for them to complete
+    for (const transaction of transactions) {
+        // Check for duplicates if -d flag is set
+        if (config.skipDuplicates) {
+            const isDuplicate = existingSheet.some(existing => 
+                existing.date === transaction.date &&
+                existing.transaction === transaction.transaction &&
+                existing.amount === transaction.amount
+            );
+            
+            if (isDuplicate) {
+                if (config.verbose) {
+                    console.log(chalk.yellow(`Skipping duplicate transaction: ${transaction.transaction} on ${transaction.date}`));
+                }
+                continue;
+            }
+        }
 
-  // Small delay to ensure file system has completed writing
-  await new Promise(resolve => setTimeout(resolve, 100));
+        prompt = getPrompt(existingSheet, transaction, categories);
+        category = await queryModel(prompt);
+        console.log(chalk.blue(`Categorized as: ${chalk.bold(category)}`));
+        // Wait for append to complete before continuing
+        await new Promise((resolve, reject) => {
+            appendToExisting(transaction, category, resolve);
+        });
+    }
+    
+    // Small delay to ensure file system has completed writing
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    // Generate and display the summary
+    const summaryTable = createMonthlySummary(existingSheet);
+    console.log(chalk.yellow('\n=== Monthly Spending Summary ==='));
+    console.log(summaryTable);
 
-  // Generate and display the summary
-  const summaryTable = createMonthlySummary(existingSheet);
-  console.log(chalk.yellow('\n=== Monthly Spending Summary ==='));
-  console.log(summaryTable);
+    // Get initial context
+    console.log(chalk.yellow('\n=== Additional Context ==='));
+    console.log(chalk.cyan('To get more personalized financial insights, you can provide additional context about your situation.'));
+    console.log(chalk.gray('Suggestions: annual income, age, savings, investments, debt, financial goals, specific questions'));
+    console.log(chalk.gray('(Press Enter to skip)\n'));
+    
+    const initialContext = await askQuestion(chalk.green('What additional information would you like to share? '));
+    
+    // Start interactive conversation
+    await startConversation(summaryTable, initialContext);
 
-  // Get initial context
-  console.log(chalk.yellow('\n=== Additional Context ==='));
-  console.log(chalk.cyan('To get more personalized financial insights, you can provide additional context about your situation.'));
-  console.log(chalk.gray('Suggestions: annual income, age, savings, investments, debt, financial goals, specific questions'));
-  console.log(chalk.gray('(Press Enter to skip)\n'));
-
-  const initialContext = await askQuestion(chalk.green('What additional information would you like to share? '));
-
-  // Start interactive conversation
-  await startConversation(summaryTable, initialContext);
-
-  rl.close();
+    rl.close();
 }
 
 console.log('Loading data from files')
