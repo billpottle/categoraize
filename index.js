@@ -173,7 +173,7 @@ async function queryModel(prompt) {
   }
   try {
     const response = await axios.post('http://localhost:11434/api/generate', {
-      model: 'llama3.2:latest',
+      model: config.model,
       stream: false,
       prompt: prompt,
 
