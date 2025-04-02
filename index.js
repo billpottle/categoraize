@@ -11,7 +11,7 @@ const chalk = require('chalk');
 const args = process.argv.slice(2);
 const config = {
   verbose: false,
-  model: 'llama3.2:latest',
+  model: 'deepseek-r1:32b',
   skipDuplicates: false,
   changeSign: false
 };
@@ -186,10 +186,14 @@ async function queryModel(prompt) {
     if (config.verbose) {
       console.log('API Response:', response.data);
     }
-    return response.data.response;
+    const rawResponse = response.data.response;
+    const cleanedResponse = rawResponse.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+    return cleanedResponse;
 
   } catch (error) {
     console.error('Error calling the model API:', error.message);
+    // Return null or handle the error appropriately
+    return null;
   }
 }
 
